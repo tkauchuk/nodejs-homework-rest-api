@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Contact = require('../../model');
+const { Contact } = require('../../models');
 const { defaultSchema, modifySchema } = require('../../schemas');
 
 
