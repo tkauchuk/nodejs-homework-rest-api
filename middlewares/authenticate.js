@@ -19,8 +19,11 @@ const authenticate = async (req, res, next) => {
     }
 
     jwt.verify(token, SECRET_KEY, (error, _) => {
-      error.status = 401;
-      error.message = "Not authorized";
+      if (error) {
+        error.status = 401;
+        error.message = "Not authorized";
+        throw error;
+      }
     });
 
     const userInExistence = await User.findOne({ token });

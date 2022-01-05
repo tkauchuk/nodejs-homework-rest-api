@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { User } = require("../../models");
 const { authSchema } = require("../../schemas");
+const authenticate = require("../../middlewares/authenticate");
 
 const { SECRET_KEY } = process.env;
 
@@ -75,7 +76,18 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
-router.post("/logout", async (req, res, next) => {});
-router.post("/current", async (req, res, next) => {});
+router.get("/logout", authenticate, async (req, res) => {
+  const { _id: id } = req.user;
+  await User.findByIdAndUpdate(id, { token: null });
+
+  res.status(204).send();
+});
+
+router.get("/current", authenticate, async (req, res) => {
+  const { email, subscription } = req.user;
+  res.json({
+    user: { email, subscription },
+  });
+});
 
 module.exports = router;
