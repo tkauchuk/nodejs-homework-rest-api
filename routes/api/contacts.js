@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { BadRequest, NotFound } = require("http-errors");
 const { Contact } = require("../../models");
 const { defaultSchema, modifySchema } = require("../../schemas");
 
@@ -21,9 +22,7 @@ router.get("/:id", async (req, res, next) => {
     const soughtContact = await Contact.findById(id);
 
     if (!soughtContact) {
-      const error = new Error("Not found.");
-      error.status = 404;
-      throw error;
+      throw new NotFound();
     }
     res.json(soughtContact);
   } catch (error) {
@@ -40,8 +39,7 @@ router.post("/", async (req, res, next) => {
   try {
     const { error } = defaultSchema.validate(req.body);
     if (error) {
-      error.status = 400;
-      throw error;
+      throw new BadRequest(error.message);
     }
 
     const newContact = await Contact.create(req.body);
@@ -61,9 +59,7 @@ router.delete("/:id", async (req, res, next) => {
     const deletedContact = await Contact.findByIdAndRemove(id);
 
     if (!deletedContact) {
-      const error = new Error("Not found");
-      error.status = 404;
-      throw error;
+      throw new NotFound();
     }
 
     res.json({ message: "contact deleted" });
@@ -76,16 +72,13 @@ router.put("/:id", async (req, res, next) => {
   try {
     const { error } = modifySchema.validate(req.body);
     if (error) {
-      error.status = 400;
-      throw error;
+      throw new BadRequest(error.message);
     }
     const { id } = req.params;
     const renewedContact = await Contact.findByIdAndUpdate(id, req.body, { new: true });
 
     if (!renewedContact) {
-      const err = new Error("Not found.");
-      err.status = 404;
-      throw err;
+      throw new NotFound();
     }
 
     res.json(renewedContact);
@@ -103,16 +96,12 @@ router.patch("/:id/favorite", async (req, res, next) => {
     const { id } = req.params;
     const { favorite } = req.body;
     if (!favorite) {
-      const err = new Error("missing field favorite");
-      err.status = 400;
-      throw err;
+      throw new BadRequest("Missing field favorite");
     }
 
     const renewedContact = await Contact.findByIdAndUpdate(id, { favorite }, { new: true });
     if (!renewedContact) {
-      const error = new Error("Not found.");
-      error.status = 404;
-      throw error;
+      throw new NotFound();
     }
 
     res.json(renewedContact);

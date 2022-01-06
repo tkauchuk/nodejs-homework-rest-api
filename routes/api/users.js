@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { BadRequest, Conflict, Unauthorized } = require("http-errors");
 const { User } = require("../../models");
 const { authSchema, subscriptionSchema } = require("../../schemas");
 const authenticate = require("../../middlewares/authenticate");
@@ -12,22 +13,17 @@ router.post("/signup", async (req, res, next) => {
   try {
     const { error } = authSchema.validate(req.body);
     if (error) {
-      error.status = 400;
-      throw error;
+      throw new BadRequest(error.message);
     }
 
     const { password, email } = req.body;
     const userInExistence = await User.findOne({ email });
     if (userInExistence) {
-      const error = new Error("Email in use");
-      error.status = 409;
-      throw error;
+      throw new Conflict("Email in use");
     }
 
-    const newUser = await User.create({
-      password: await bcrypt.hash(password, 10),
-      email,
-    });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await User.create({ password: hashedPassword, email });
     res.status(201).json({
       user: {
         email: newUser.email,
@@ -43,23 +39,18 @@ router.post("/login", async (req, res, next) => {
   try {
     const { error } = authSchema.validate(req.body);
     if (error) {
-      error.status = 400;
-      throw error;
+      throw new BadRequest(error.message);
     }
 
     const { email, password } = req.body;
     const userInExistence = await User.findOne({ email });
     if (!userInExistence) {
-      const error = new Error("Email or password is wrong");
-      error.status = 401;
-      throw error;
+      throw new Unauthorized("Email or password is wrong");
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, userInExistence.password);
     if (!isPasswordCorrect) {
-      const error = new Error("Email or password is wrong");
-      error.status = 401;
-      throw error;
+      throw new Unauthorized("Email or password is wrong");
     }
 
     const token = jwt.sign({ id: userInExistence._id }, SECRET_KEY, { expiresIn: "1h" });
@@ -94,14 +85,11 @@ router.patch("/", authenticate, async (req, res, next) => {
   try {
     const { subscription } = req.body;
     if (!subscription) {
-      const error = new Error("missing field subscription");
-      error.status = 400;
-      throw error;
+      throw new BadRequest("Missing field subscription");
     }
     const { error } = subscriptionSchema.validate({ subscription });
     if (error) {
-      error.status = 400;
-      throw error;
+      throw new BadRequest(error.message);
     }
 
     const { _id: id } = req.user;
