@@ -1,13 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const { BadRequest, NotFound } = require("http-errors");
+const authenticate = require("../../middlewares/authenticate");
 const { Contact } = require("../../models");
 const { defaultSchema, modifySchema } = require("../../schemas");
 
-router.get("/", async (req, res, next) => {
+router.get("/", authenticate, async (req, res, next) => {
   try {
     const { page = 1, limit = 10, favorite } = req.query;
-    const query = favorite ? { favorite } : {};
+    const { _id: id } = req.user;
+    const query = favorite ? { favorite, owner: id } : { owner: id };
     const skip = (page - 1) * limit;
     const contacts = await Contact.find(query, "", { skip, limit: parseInt(limit) });
     res.json(contacts);
@@ -16,7 +18,7 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.get("/:id", async (req, res, next) => {
+router.get("/:id", authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     const soughtContact = await Contact.findById(id);
@@ -35,14 +37,14 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", authenticate, async (req, res, next) => {
   try {
     const { error } = defaultSchema.validate(req.body);
     if (error) {
       throw new BadRequest(error.message);
     }
-
-    const newContact = await Contact.create(req.body);
+    const { _id: id } = req.user;
+    const newContact = await Contact.create({ ...req.body, owner: id });
     res.status(201).json(newContact);
   } catch (error) {
     const validationError = "contact validation failed";
@@ -53,7 +55,7 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.delete("/:id", async (req, res, next) => {
+router.delete("/:id", authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     const deletedContact = await Contact.findByIdAndRemove(id);
