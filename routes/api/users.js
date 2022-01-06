@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { User } = require("../../models");
-const { authSchema } = require("../../schemas");
+const { authSchema, subscriptionSchema } = require("../../schemas");
 const authenticate = require("../../middlewares/authenticate");
 
 const { SECRET_KEY } = process.env;
@@ -88,6 +88,33 @@ router.get("/current", authenticate, async (req, res) => {
   res.json({
     user: { email, subscription },
   });
+});
+
+router.patch("/", authenticate, async (req, res, next) => {
+  try {
+    const { subscription } = req.body;
+    if (!subscription) {
+      const error = new Error("missing field subscription");
+      error.status = 400;
+      throw error;
+    }
+    const { error } = subscriptionSchema.validate({ subscription });
+    if (error) {
+      error.status = 400;
+      throw error;
+    }
+
+    const { _id: id } = req.user;
+    const renewedUser = await User.findByIdAndUpdate(id, { subscription }, { new: true });
+    res.json({
+      user: {
+        email: renewedUser.email,
+        subscription: renewedUser.subscription,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;
