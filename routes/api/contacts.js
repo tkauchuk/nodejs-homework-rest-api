@@ -58,7 +58,8 @@ router.post("/", authenticate, async (req, res, next) => {
 router.delete("/:id", authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const deletedContact = await Contact.findByIdAndRemove(id);
+    const { _id: userId } = req.user;
+    const deletedContact = await Contact.findOneAndDelete({ id, owner: userId });
 
     if (!deletedContact) {
       throw new NotFound();
@@ -70,14 +71,15 @@ router.delete("/:id", authenticate, async (req, res, next) => {
   }
 });
 
-router.put("/:id", async (req, res, next) => {
+router.put("/:id", authenticate, async (req, res, next) => {
   try {
     const { error } = modifySchema.validate(req.body);
     if (error) {
       throw new BadRequest(error.message);
     }
     const { id } = req.params;
-    const renewedContact = await Contact.findByIdAndUpdate(id, req.body, { new: true });
+    const { _id: userId } = req.user;
+    const renewedContact = await Contact.findOneAndUpdate({ id, owner: userId }, req.body, { new: true });
 
     if (!renewedContact) {
       throw new NotFound();
@@ -93,7 +95,7 @@ router.put("/:id", async (req, res, next) => {
   }
 });
 
-router.patch("/:id/favorite", async (req, res, next) => {
+router.patch("/:id/favorite", authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { favorite } = req.body;
@@ -101,7 +103,8 @@ router.patch("/:id/favorite", async (req, res, next) => {
       throw new BadRequest("Missing field favorite");
     }
 
-    const renewedContact = await Contact.findByIdAndUpdate(id, { favorite }, { new: true });
+    const { _id: userId } = req.user;
+    const renewedContact = await Contact.findOneAndUpdate({ id, owner: userId }, { favorite }, { new: true });
     if (!renewedContact) {
       throw new NotFound();
     }
