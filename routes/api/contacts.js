@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { BadRequest, NotFound } = require("http-errors");
-const authenticate = require("../../middlewares/authenticate");
+const { authenticate } = require("../../middlewares");
 const { Contact } = require("../../models");
 const { defaultSchema, modifySchema } = require("../../schemas");
 
