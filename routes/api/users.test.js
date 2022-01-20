@@ -42,10 +42,7 @@ describe("users authentication", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body.token).toBeTruthy();
 
-    // const user = await User.findById(response.body._id);
-    const users = await User.find({});
-    const user = users[0];
-
+    const user = await User.findById(response.body.user.id);
     expect(user).toBeTruthy();
     expect(typeof user.email).toBe("string");
     expect(typeof user.subscription).toBe("string");
