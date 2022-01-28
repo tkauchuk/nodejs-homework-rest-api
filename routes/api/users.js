@@ -4,15 +4,16 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const path = require("path");
 const fs = require("fs/promises");
-// const Jimp = require("jimp");
-const { BadRequest, Conflict, Unauthorized } = require("http-errors");
+const { BadRequest, Conflict, Unauthorized, NotFound } = require("http-errors");
 const gravatar = require("gravatar");
+const { v4: uuidv4 } = require("uuid");
 const { User } = require("../../models");
 const { authSchema, subscriptionSchema } = require("../../schemas");
 const { authenticate, upload } = require("../../middlewares");
 const resizer = require("../../service");
+const sender = require("../../utils");
 
-const { SECRET_KEY } = process.env;
+const { SECRET_KEY, VERIFICATION_DOMAIN } = process.env;
 const avatarsPath = path.join(__dirname, "../../", "public", "avatars");
 
 router.post("/signup", async (req, res, next) => {
@@ -30,7 +31,16 @@ router.post("/signup", async (req, res, next) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const avatarURL = gravatar.url(email);
-    const newUser = await User.create({ password: hashedPassword, email, avatarURL });
+    const verificationToken = uuidv4();
+    const newUser = await User.create({ password: hashedPassword, verificationToken, email, avatarURL });
+
+    const emailSample = {
+      to: email,
+      subject: "Email verification",
+      html: `<a target="_blank" href="${VERIFICATION_DOMAIN}/users/verify/${verificationToken}">Verify your email!</a>`,
+    };
+    await sender(emailSample);
+
     res.status(201).json({
       user: {
         email: newUser.email,
@@ -53,6 +63,10 @@ router.post("/login", async (req, res, next) => {
     const userInExistence = await User.findOne({ email });
     if (!userInExistence) {
       throw new Unauthorized("Email or password is wrong");
+    }
+
+    if (!userInExistence.verify) {
+      throw new Unauthorized("Email hasn't been verified yet");
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, userInExistence.password);
@@ -124,6 +138,47 @@ router.patch("/avatars", authenticate, upload.single("avatar"), async (req, res)
   const avatarURL = path.join("avatars", uniqueFilename);
   await User.findByIdAndUpdate({ _id: userId }, { avatarURL }, { new: true });
   res.json({ avatarURL });
+});
+
+router.get("/verify/:verificationToken", async (req, res, next) => {
+  try {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      throw new NotFound("User not found");
+    }
+    await User.findByIdAndUpdate(user._id, { verificationToken: null, verify: true });
+    res.json({ message: "Verification successful" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/verify", async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      throw new BadRequest("Missing required field email");
+    }
+    const user = User.findOne({ email });
+    if (!user) {
+      throw new NotFound();
+    }
+    if (user.verify) {
+      throw new BadRequest("Verification has already been passed");
+    }
+    const { verificationToken } = user;
+    const emailSample = {
+      to: email,
+      subject: "Email verification",
+      html: `<a target="_blank" href="${VERIFICATION_DOMAIN}/users/verify/${verificationToken}">Verify your email!</a>`,
+    };
+    await sender(emailSample);
+    res.json({ message: "Verification email sent" });
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;
